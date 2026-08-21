@@ -1,0 +1,77 @@
+name: Verify collab related-video links
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "after (fix branch)"
+            repository: ${{ github.repository }}
+            ref: ""
+            expect_link: true
+          - name: "before (upstream master)"
+            repository: iv-org/invidious
+            ref: "master"
+            expect_link: false
+
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.ref }}
+
+      - name: Build and start stack
+        run: |
+          sed -i '/hmac_key/s/CHANGE_ME!!/verify-hmac-key/' docker-compose.yml
+          docker compose up -d --build
+
+      - name: Wait for app
+        run: curl -If http://localhost:3000 --retry 40 --retry-delay 5 --retry-all-errors
+
+      - name: Check API for collab related video
+        run: |
+          curl -s "http://localhost:3000/api/v1/videos/IZZVijQ0gkA?fields=recommendedVideos" -o api.json || true
+          head -c 600 api.json
+          echo ""
+          echo "--- collab entries (author / authorId) ---"
+          jq -r '.recommendedVideos[]? | select(.author | test("and ")) | "\(.author) => \(.authorId // "EMPTY")"' api.json | tee collab.txt
+          echo "--- verdict ---"
+          if [ "${{ matrix.expect_link }}" = "true" ]; then
+            if grep -qE "=> UC[A-Za-z0-9_-]+$" collab.txt; then
+              echo "PASS: collab related videos carry a channel id"
+            else
+              echo "FAIL: expected channel ids on collab entries"
+              exit 1
+            fi
+          else
+            if grep -qE "=> UC[A-Za-z0-9_-]+$" collab.txt; then
+              echo "UNEXPECTED: master already links collabs?"
+              exit 1
+            else
+              echo "PASS (baseline): master leaves collab entries without channel id"
+            fi
+          fi
+
+      - name: Check rendered watch page
+        run: |
+          curl -s "http://localhost:3000/watch?v=IZZVijQ0gkA" -o watch.html || true
+          wc -c watch.html
+          grep -o 'Diary Of A CEO and World Science Festival' watch.html | head -1 || echo "author text not on page"
+          grep -oE '<a[^>]*href="/channel/[^"]*"[^>]*>[^<]*Diary Of A CEO[^<]*' watch.html | head -2 || echo "no channel anchor around collab author"
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-${{ matrix.expect_link }}
+          path: |
+            api.json
+            watch.html
+            collab.txt
