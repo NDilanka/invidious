@@ -48,7 +48,7 @@ jobs:
             invidious-companion:
               image: quay.io/invidious/invidious-companion:latest
               environment:
-                SERVER_SECRET_KEY: "verifykey123456"
+                SERVER_SECRET_KEY: "verifykey1234567"
                 HOST: "0.0.0.0"
           EOF
           docker compose up -d --build
