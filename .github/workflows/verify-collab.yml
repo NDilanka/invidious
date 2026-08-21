@@ -44,7 +44,7 @@ jobs:
                   hmac_key: "verify-hmac-key"
                   invidious_companion:
                     - private_url: "http://invidious-companion:8282/companion"
-                  invidious_companion_key: "verifykey123456"
+                  invidious_companion_key: "verifykey1234567"
             invidious-companion:
               image: quay.io/invidious/invidious-companion:latest
               environment:
@@ -55,6 +55,10 @@ jobs:
 
       - name: Wait for app
         run: curl -If http://localhost:3000 --retry 40 --retry-delay 5 --retry-all-errors
+
+      - name: Dump compose logs on failure
+        if: failure()
+        run: docker compose logs --tail 100
 
       - name: Check API for collab related video
         run: |
