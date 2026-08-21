@@ -60,9 +60,19 @@ jobs:
         if: failure()
         run: docker compose logs --tail 100
 
+      - name: Stack status
+        run: |
+          docker compose ps
+          docker compose logs invidious-companion --tail 40 || true
+
       - name: Check API for collab related video
         run: |
-          curl -s "http://localhost:3000/api/v1/videos/IZZVijQ0gkA?fields=recommendedVideos" -o api.json || true
+          for i in 1 2 3 4 5; do
+            curl -s "http://localhost:3000/api/v1/videos/IZZVijQ0gkA?fields=recommendedVideos" -o api.json || true
+            if ! grep -q "Invidious companion" api.json; then break; fi
+            echo "companion hiccup, retry $i"
+            sleep 10
+          done
           head -c 600 api.json
           echo ""
           echo "--- collab entries (author / authorId) ---"
