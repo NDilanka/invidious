@@ -67,11 +67,11 @@ jobs:
 
       - name: Check API for collab related video
         run: |
-          for i in 1 2 3 4 5; do
+          for i in $(seq 1 12); do
             curl -s "http://localhost:3000/api/v1/videos/IZZVijQ0gkA?fields=recommendedVideos" -o api.json || true
-            if ! grep -q "Invidious companion" api.json; then break; fi
-            echo "companion hiccup, retry $i"
-            sleep 10
+            if ! grep -qiE "companion|potoken" api.json; then break; fi
+            echo "waiting for companion/potoken, retry $i"
+            sleep 15
           done
           head -c 600 api.json
           echo ""
